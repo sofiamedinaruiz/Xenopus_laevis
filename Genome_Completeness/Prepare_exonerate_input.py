@@ -1,14 +1,15 @@
 #module load python/2.7-anaconda-4.4 && source activate Cori_new
 # Created by Sofia Medina, Rokhsar lab, UC Berkeley - Nov 15, 2019
 # Prepare the input files for Exonerate (cds2genome). 
-# To run: python python Prepare_exonerate_input.py xl_mgc_cds_nt.fasta  -d xl_mrna.data -s 50
+# To run: python python Prepare_exonerate_input.py xl_mgc_cds_nt.fasta  -d xl_mrna.data -s 50 -o All_Fasta
+
 
 import argparse, os, pysam, sys
 import pandas as pd
 import numpy as np
 import os
 from Bio import SeqIO
-
+import math
 
 def ensure_dir(directory):
     if not os.path.exists(directory):
@@ -59,26 +60,27 @@ def main():
         
     fasta_out = open(fasta_out_name, 'w')
     anot_out = open(annotation_file, 'w')
-    print "Will save: ", annotation_file
-    print "Will save: ", ''.join((prefix_all,str(counter),'.fa'))
+    print "Will save annotation file as: ", annotation_file
+    print "Will save split fasta files as: ", ''.join((prefix_all,'*.fa'))
 
     for record in SeqIO.parse(args.fasta, "fasta"):
-        if counter < 100000000:
-            anot = '\t'.join((record.id,'+',str(1),str(len(record.seq))))
-            anot_out.write((''.join((anot,'\n')))) 
-            sequence  = ''.join(('>',record.id,' ',str(genbank_dict[record.id]['GenBank def line']),'\n',str(record.seq),'\n'))
-            fasta_out.write(sequence)
-            if np.mod(counter, args.split) == 0:
-                fasta_out.close()
-                fasta_out_name = ''.join((prefix_all,str(counter),'.fa'))
-                print "Will save: ", fasta_out_name
-                fasta_out = open(''.join((prefix_all,str(counter),'.fa')), 'w')
-
-            counter=counter+1
+        anot = '\t'.join((record.id,'+',str(1),str(len(record.seq))))
+        anot_out.write((''.join((anot,'\n')))) 
+        sequence  = ''.join(('>',record.id,' ',str(genbank_dict[record.id]['GenBank def line']),'\n',str(record.seq),'\n'))
+        fasta_out.write(sequence)
+        if np.mod(counter, args.split) == 0:
+            fasta_out.close()
+            fasta_out_name = ''.join((prefix_all,str(counter),'.fa'))
+            #print "Will save: ", fasta_out_name
+            fasta_out = open(''.join((prefix_all,str(counter),'.fa')), 'w')
+        counter=counter+1
     
+
     anot_out.close()
     fasta_out.close()
-    
+    print "Total number of sequences:", counter
+    print "Total number of fasta files created:", int(math.ceil(counter/float(args.split)))
+    return()
     
 if __name__=='__main__':
     main()
