@@ -1,25 +1,24 @@
-#module load python/2.7-anaconda-4.4 && source activate Cori_new
+# module load python/2.7-anaconda-5.2 && source activate Cori_new
 # Created by Sofia Medina, Rokhsar lab, UC Berkeley - Nov 15, 2019
 # Make Exonerate executables for all slit fasta files (cds2genome). 
 # To run: python Exonerate_multiFile.py -g path_to_genome -a path_to_anotation -f Dir_with_multiple_fasta
-
-
-
+#         python Exonerate_multiFile_FINAL.py -f Fasta_CDS/ -a Fasta_CDS/xl_mgc_cds_nt_anot.tab  -g ../Xenla10.1.fa
+          
 import os
 import subprocess
 import datetime
 import glob
 import argparse, os, pysam, sys
 
-
 def parse_args():
     parser = argparse.ArgumentParser(description='Create executables for exonerate Exonerate (cds2genome)')
     parser.add_argument('-f', '--fastaDir', metavar='STR', help='Directory with all split CDS fasta files', type=str, default='Fasta_CDS/')
     parser.add_argument('-a', '--annotation', metavar='STR', help='CDS annotation file (.tab)', type=str, default='')
-    parser.add_argument('-m', '--moduleLoad', metavar='STR', help='Commands to load exonerate', type=str, default="module load python/2.7-anaconda-4.4 && source activate Cori_new && ")
+    parser.add_argument('-s', '--scoreMin', metavar='INT', help='Minimum Score', type=int, default=250)
+    parser.add_argument('-m', '--moduleLoad', metavar='STR', help='Commands to load exonerate', type=str, default="module load python/2.7-anaconda-5.2 && source activate Cori_new && ")
     parser.add_argument("-v", "--version", action='version', version='%(prog)s 1.0')
     required = parser.add_argument_group('required arguments')
-    required.add_argument('-g', "--genome", help="Path to genome", type=str)
+    required.add_argument('-g', "--genome", help="Path to genome", type=str, default ='')
     args = parser.parse_args()
     
 
@@ -40,7 +39,7 @@ def ensure_dir(file_path):
     return()
 
 
-def make_prot2genome_exonerate_executable(path_with_ALL_single_fasta_files, genome_dir, anot_file, MODULE_LOAD):
+def make_prot2genome_exonerate_executable(path_with_ALL_single_fasta_files, genome_dir, anot_file, score, MODULE_LOAD):
     test ="False"
     today_date = datetime.date.today()
     
@@ -49,11 +48,12 @@ def make_prot2genome_exonerate_executable(path_with_ALL_single_fasta_files, geno
     fasta_single_files =  sorted(list(glob.glob(path_with_ALL_single_fasta_files)))
     genome_name        =  genome_dir.split("/")[-1].split(".fa")[0]
     exonerate_dir_out  =  ''.join(("EXONERATE_",genome_name,"/"))
-    Exec_out_file      =  ''.join((genome_name,"_",str(today_date),"_exonerate.sh"))
-    
+    out_dir_summary    =  'Exonerate_summary'
+    #Exec_out_file      =  ''.join((genome_name,"_",str(today_date),"_exonerate.sh"))
+    Exec_out_file      =  ''.join(('Exonerate_multiFile_',str(today_date),".sh"))
     
     ex_com_1  = "exonerate --model coding2genome"
-    ex_com_2 = "--score 150 --percent 20 --softmaskquery no --softmasktarget no --showcigar yes  --showvulgar yes --minintron 20 --maxintron 1000000 --geneseed 50 --showtargetgff yes --showquerygff yes --ryo"
+    ex_com_2 = "--cores 8 --dpmemory 2000 --percent 20 --softmaskquery no --softmasktarget no --showcigar yes  --showvulgar yes --minintron 20 --maxintron 1000000 --geneseed 50 --showtargetgff yes --showquerygff yes --ryo "
     ex_ryo = '"[%ps]\\t%S%C" '
 
     print "Working directory:\t%s"    %os.getcwd()
@@ -70,43 +70,41 @@ def make_prot2genome_exonerate_executable(path_with_ALL_single_fasta_files, geno
         os.makedirs(exonerate_dir_out)
         print "Created directory for:\t\t\n", exonerate_dir_out
     
-
     
     F_out = open(Exec_out_file,"w") 
 
-    
     for single_fasta in fasta_single_files:
         sequence_name      = single_fasta.split("/")[-1].split(".fa")[0]
         seq_query          = single_fasta
-        output_sinle_fasta = ''.join((">",exonerate_dir_out,sequence_name,".exonerate"))
+        output_single_exonerate = ''.join((">",exonerate_dir_out,sequence_name,".exonerate"))
         touch_file = ''.join((exonerate_dir_out,sequence_name,'.done'))
         touch_final        = ''.join((' && touch ', touch_file))
+        exonerate_parser   = ' '.join((" && python ~/SCRIPTS/Python_scripts/For_Paper/Exonerate/Exonerate_parser.py -e", output_single_exonerate.replace('>',''),' -a',anot_file, '-o ',out_dir_summary))
+        
+        
         if not os.path.exists(touch_file):
             if len(anot_file) > 0:
                 annot_command      = ' '.join(("--annotation",anot_file))
-                exonerate_commands = ' '.join((MODULE_LOAD, ex_com_1, seq_query, genome_dir, ex_com_2, ex_ryo, annot_command, output_sinle_fasta,touch_final,"\n"))
+                exonerate_commands = ' '.join((MODULE_LOAD, ex_com_1, seq_query, genome_dir, ex_com_2,ex_ryo, ' --score ', str(score), annot_command, output_single_exonerate,touch_final,exonerate_parser,"\n"))
             else:
-                exonerate_commands = ' '.join((MODULE_LOAD, ex_com_1, seq_query, genome_dir, ex_com_2, ex_ryo, output_sinle_fasta,touch_final,"\n"))
+                exonerate_commands = ' '.join((MODULE_LOAD, ex_com_1, seq_query, genome_dir, ex_com_2,ex_ryo, ex_ryo,' --score ', str(score), output_single_exonerate,touch_final,"\n"))
             F_out.write(exonerate_commands)
     F_out.close()
-    
-    ####HERE"
     return(Exec_out_file)
 
 
 def run_executable(Exec_out_file):
     n_commands = file_len(Exec_out_file)
-    qbatch_folder =  Exec_out_file.split(".sh")[0]
     
     print "Your executive file has #%s commands " %n_commands
     if n_commands > 10 : 
         #num_rounds    = int(round(n_commands/10))
-        num_rounds = 5
-        time          = "23:50:00"
-        exeq_run      =  ' '.join(('qbatch submit -p 1 -R 3 -t',time, "-S",str(num_rounds), "-n", qbatch_folder, Exec_out_file, qbatch_folder ))
+        num_rounds = 4
+        time          = "20:00:00"
+        exeq_run      =  ' '.join(('qbatch submit -p 8 -R 3 -t',time, "-S",str(num_rounds),  Exec_out_file ))
     else:
         time          = "00:30:00"
-        exeq_run      = ' '.join(('qbatch submit -p 1 -R 3 -t', time, "-n", qbatch_folder, Exec_out_file, qbatch_folder ))
+        exeq_run      = ' '.join(('qbatch submit -p 8 -R 3 -t', time, "-n", Exec_out_file ))
     return(exeq_run)
 
 def file_len(fname):
@@ -121,11 +119,10 @@ def file_len(fname):
 def main():
     args = parse_args()
     MODULE_LOAD =  args.moduleLoad
-#    MODULE_LOAD = "module load python/2.7-anaconda-4.4 && source activate Cori_new && "
-    Exec_out_file = make_prot2genome_exonerate_executable(args.fastaDir, args.genome, args.annotation, MODULE_LOAD)
+    score = args.scoreMin
+    Exec_out_file = make_prot2genome_exonerate_executable(args.fastaDir, args.genome, args.annotation, score, MODULE_LOAD)
     exeq_run      = run_executable(Exec_out_file)   
     print exeq_run
-
 
 
 if __name__=='__main__':
