@@ -53,7 +53,7 @@ def make_prot2genome_exonerate_executable(path_with_ALL_single_fasta_files, geno
     Exec_out_file      =  ''.join(('Exonerate_multiFile_',str(today_date),".sh"))
     
     ex_com_1  = "exonerate --model coding2genome"
-    ex_com_2 = "--cores 8 --dpmemory 2000 --percent 20 --softmaskquery no --softmasktarget no --showcigar yes  --showvulgar yes --minintron 20 --maxintron 1000000 --geneseed 50 --showtargetgff yes --showquerygff yes --ryo "
+    ex_com_2 = "--cores 1 --fsmmemory 2000 --percent 20 --softmaskquery no --softmasktarget no --showcigar yes  --showvulgar yes --minintron 20 --maxintron 1000000 --geneseed 50 --showtargetgff yes --showquerygff yes --ryo "
     ex_ryo = '"[%ps]\\t%S%C" '
 
     print "Working directory:\t%s"    %os.getcwd()
