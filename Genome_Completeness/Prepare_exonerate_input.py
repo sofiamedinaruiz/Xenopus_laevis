@@ -1,4 +1,4 @@
-#module load python/2.7-anaconda-4.4 && source activate Cori_new
+# module load python/2.7-anaconda-5.2 && source activate Cori_new
 # Created by Sofia Medina, Rokhsar lab, UC Berkeley - Nov 15, 2019
 # Prepare the input files for Exonerate (cds2genome). 
 # To run: python python Prepare_exonerate_input.py xl_mgc_cds_nt.fasta  -d xl_mrna.data -s 50 -o All_Fasta
